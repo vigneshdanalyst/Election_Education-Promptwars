@@ -1,0 +1,70 @@
+<div class="animate-in">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <a href="#candidates" class="btn btn-primary" style="text-decoration:none;">← Back to Explorer</a>
+        <h2 class="text-saffron">Candidate Profile</h2>
+    </div>
+
+    <div class="grid-2">
+        <div class="card" style="text-align:center;">
+            <img id="c-photo" src="" style="width:150px; height:150px; border-radius:50%; border:4px solid var(--border); margin-bottom:15px;">
+            <h1 id="c-name" class="text-saffron">---</h1>
+            <p id="c-party" class="badge" style="font-size:1.2em;">---</p>
+            <p id="c-constituency" class="text-muted mt-1">---</p>
+            
+            <div class="mt-2" style="display:flex; justify-content:center; gap:20px;">
+                <div class="stat-box">
+                    <div class="stat-val" id="c-age">--</div>
+                    <div class="stat-label">Age</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-val" id="c-gender">--</div>
+                    <div class="stat-label">Gender</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Personal Information</h3>
+            <hr style="border:0; border-top:1px solid var(--border); margin:15px 0;">
+            <p><strong>Education:</strong> <span id="c-edu">---</span></p>
+            <p class="mt-1"><strong>Profession:</strong> <span id="c-prof">---</span></p>
+            <p class="mt-1"><strong>PAN Status:</strong> <span id="c-pan">---</span></p>
+            
+            <div class="mt-2 p-1" style="background:var(--bg-primary); border-radius:8px;">
+                <h4 style="margin-bottom:10px;">Criminal Record</h4>
+                <div id="c-criminal-summary" style="font-size:1.2em; font-weight:bold;">---</div>
+                <small class="text-muted">Self-declared in affidavit</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-2">
+        <h3>Financial Assets (Declared)</h3>
+        <div class="grid-3 mt-2">
+            <div class="stat-box" style="background:var(--bg-primary);">
+                <div class="stat-label">Total Assets</div>
+                <div class="stat-val text-saffron" id="c-assets-total">₹0 Cr</div>
+            </div>
+            <div class="stat-box" style="background:var(--bg-primary);">
+                <div class="stat-label">Movable Assets</div>
+                <div class="stat-val" id="c-assets-movable">₹0 Cr</div>
+            </div>
+            <div class="stat-box" style="background:var(--bg-primary);">
+                <div class="stat-label">Immovable Assets</div>
+                <div class="stat-val" id="c-assets-immovable">₹0 Cr</div>
+            </div>
+        </div>
+        
+        <div class="mt-2 p-1" style="border:1px solid var(--border); border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <strong>Total Liabilities</strong><br>
+                <small class="text-muted">Debts/Loans</small>
+            </div>
+            <div id="c-liabilities" class="text-red" style="font-size:1.5em; font-weight:bold;">₹0 Cr</div>
+        </div>
+
+        <div style="height:300px; width:100%; margin-top:20px;">
+            <canvas id="assetChart"></canvas>
+        </div>
+    </div>
+</div>

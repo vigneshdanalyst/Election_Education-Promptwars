@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Matdata Mitra | Election Intelligence Dashboard</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="stylesheet" href="/static/css/styles.css">
+    
+    <!-- Leaflet & Chart.js -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+    <!-- Top Navbar -->
+    <nav class="navbar">
+        <div class="nav-left">
+            <a href="#home" class="logo">
+                <span class="saffron">Matdata</span><span>Mitra</span><span class="green">🇮🇳</span>
+            </a>
+            <div class="nav-links">
+                <a href="#home">Dashboard</a>
+                <a href="#parties">Parties</a>
+                <a href="#candidates">Candidates</a>
+                <a href="#constituencies">Constituencies</a>
+                <a href="#elector-stats">Demographics</a>
+                <a href="#results">Results</a>
+                <a href="#chat">AI Assistant</a>
+            </div>
+            <div class="global-filters" style="display:flex; gap:15px; margin-left:30px; align-items:center;">
+                <select id="global-state-filter" onchange="window.app.onGlobalFilterChange(event)" style="background:var(--bg-secondary); color:white; border:1px solid var(--border); padding:6px 12px; border-radius:6px; cursor:pointer; font-size:14px; outline:none;">
+                    <option value="" style="background:var(--bg-primary); color:white;">All India (5 States)</option>
+                </select>
+                <select id="global-constituency-filter" onchange="window.app.onGlobalFilterChange(event)" style="background:var(--bg-secondary); color:white; border:1px solid var(--border); padding:6px 12px; border-radius:6px; cursor:pointer; font-size:14px; outline:none;">
+                    <option value="" style="background:var(--bg-primary); color:white;">All Constituencies</option>
+                </select>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Area where pages are injected -->
+    <main id="app-root" class="container">
+        <!-- JS will load fragments here -->
+    </main>
+
+    <footer style="text-align:center; padding: 2rem; color: var(--text-muted); border-top: 1px solid var(--border); margin-top: 2rem;">
+        <p>Data sourced from ECI · For informational purposes only</p>
+    </footer>
+
+    <!-- Global Modal Overlay -->
+    <div class="modal-overlay" id="global-modal" onclick="this.classList.remove('active')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div id="modal-body"></div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/static/sw.js').catch(err => console.warn('SW registration failed:', err));
+            });
+        }
+    </script>
+</body>
+</html>

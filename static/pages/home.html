@@ -1,0 +1,64 @@
+<div>
+    <div class="stats-row">
+        <div class="card stat-card">
+            <div class="label">Total Seats</div>
+            <div class="value" id="stat-seats">--</div>
+        </div>
+        <div class="card stat-card">
+            <div class="label">Candidates</div>
+            <div class="value text-saffron" id="stat-candidates">--</div>
+        </div>
+        <div class="card stat-card">
+            <div class="label">Total Electors</div>
+            <div class="value" id="stat-electors">--</div>
+        </div>
+        <div class="card stat-card">
+            <div class="label">Votes Polled</div>
+            <div class="value" id="stat-polled">--</div>
+        </div>
+        <div class="card stat-card">
+            <div class="label">Turnout</div>
+            <div class="value text-green" id="stat-turnout">--%</div>
+        </div>
+    </div>
+
+    <div class="grid-2 mb-2">
+        <div class="card">
+            <h2 class="section-header">State Summary</h2>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>State/UT</th>
+                            <th>Seats</th>
+                            <th>Candidates</th>
+                            <th>Electors</th>
+                            <th>Votes Polled</th>
+                            <th>Turnout</th>
+                        </tr>
+                    </thead>
+                    <tbody id="state-summary-tbody">
+                        <tr><td colspan="6" class="text-muted">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card">
+            <h2 class="section-header">Quick Portals</h2>
+            <div class="grid-2">
+                <a href="#candidates" class="card" style="text-align:center; padding: 1rem; border-color: var(--accent-blue)">
+                    <h3 style="color:var(--accent-blue)">Candidates Explorer</h3>
+                </a>
+                <a href="#results" class="card" style="text-align:center; padding: 1rem; border-color: var(--accent-green)">
+                    <h3 style="color:var(--accent-green)">Live Results</h3>
+                </a>
+                <a href="#chat" class="card" style="text-align:center; padding: 1rem; border-color: var(--accent-saffron)">
+                    <h3 style="color:var(--accent-saffron)">AI Assistant</h3>
+                </a>
+                <a href="#constituencies" class="card" style="text-align:center; padding: 1rem; border-color: #fff">
+                    <h3 style="color:#fff">Maps & Data</h3>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>

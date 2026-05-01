@@ -1,0 +1,45 @@
+<div>
+    <h2 class="section-header">Elector Demographics</h2>
+    
+    <div class="grid-4 mb-2">
+        <div class="card stat-card">
+            <div class="label">Total Electors</div>
+            <div class="value" id="e-total">--</div>
+        </div>
+        <div class="card stat-card">
+            <div class="label">Votes Polled</div>
+            <div class="value text-blue" id="e-polled">--</div>
+        </div>
+        <div class="card stat-card">
+            <div class="label">Overall Turnout</div>
+            <div class="value" id="e-turnout" style="color: pink">--</div>
+        </div>
+        <div class="card stat-card">
+            <div class="label">States/UT</div>
+            <div class="value text-green" id="e-states">--</div>
+        </div>
+    </div>
+
+    <div class="card mb-2" style="background:var(--bg-secondary); border-top: 4px solid var(--accent-saffron)">
+        <h3>2026 Assembly Elections - State Turnout</h3>
+        <div id="turnout-2026" style="display:flex; justify-content:space-around; align-items:center; flex-wrap:wrap; margin-top:10px;">
+            <!-- Turnout data injected by JS -->
+        </div>
+    </div>
+
+    <div class="grid-2 mb-2">
+        <div class="card">
+            <h3 class="mb-2">Elector Base by State</h3>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead><tr><th>State/UT</th><th>Electors</th><th>Votes Polled</th><th>Turnout</th></tr></thead>
+                    <tbody id="elector-state-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card">
+            <h3 class="mb-2">Turnout Comparison</h3>
+            <canvas id="ageChart"></canvas>
+        </div>
+    </div>
+</div>

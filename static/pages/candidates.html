@@ -1,0 +1,39 @@
+<div>
+    <h2 class="section-header">Candidates Explorer</h2>
+    
+    <div class="card mb-2" style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+        <input id="candidate-search" type="text" placeholder="Search loaded candidates..." style="padding:0.5rem; background:var(--bg-primary); border:1px solid var(--border); color:white; border-radius:4px; flex:1">
+        <select id="candidate-reserved" style="padding:0.5rem; background:var(--bg-primary); border:1px solid var(--border); color:white; border-radius:4px;">
+            <option value="">All Types</option>
+            <option value="GEN">GEN</option>
+            <option value="SC">SC</option>
+            <option value="ST">ST</option>
+        </select>
+        <button onclick="initCandidates()" style="padding:0.5rem 1rem; background:var(--accent-saffron); color:#000; border:none; border-radius:4px; cursor:pointer;">Refresh</button>
+        <span class="text-muted" id="candidate-source">MyNeta live data</span>
+    </div>
+
+    <div class="card table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Photo</th>
+                    <th>Candidate Details</th>
+                    <th>Party</th>
+                    <th>Constituency</th>
+                    <th>Education</th>
+                    <th>Assets</th>
+                    <th>Criminal</th>
+                </tr>
+            </thead>
+            <tbody id="candidates-tbody">
+                <!-- Data loaded via JS -->
+            </tbody>
+        </table>
+    </div>
+    <div class="pagination-bar">
+        <button id="candidate-prev" onclick="changeCandidatePage(-1)">Previous</button>
+        <span id="candidate-page-info">Page 1</span>
+        <button id="candidate-next" onclick="changeCandidatePage(1)">Next</button>
+    </div>
+</div>
