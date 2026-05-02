@@ -83,6 +83,7 @@ ELECTION_STATES_2026 = {
 LIVE_CACHE = {}
 LIVE_CACHE_SECONDS = 900
 DB_FALLBACK_FILES = ["matdata_mitra.db", "election_data.db"]
+PARTY_CACHE_SECONDS = 43200
 
 PARTY_COLORS = {
     "DMK": "#D32F2F", "INC": "#1976D2", "BJP": "#F57C00", "AIADMK": "#388E3C",
@@ -161,6 +162,20 @@ def _cache_get(key):
 def _cache_set(key, value):
     LIVE_CACHE[key] = {"time": time.time(), "value": value}
     return value
+
+def _normalize_party_name(value):
+    return re.sub(r"\s+", " ", (value or "").strip())
+
+def _make_party_key(full_name, abbreviation):
+    return f"{_normalize_party_name(full_name).lower()}|{(abbreviation or '').strip().upper()}"
+
+def _abbr_from_name(full_name):
+    words = [w for w in re.split(r"[^A-Za-z0-9]+", full_name or "") if w]
+    if not words:
+        return ""
+    if len(words) == 1:
+        return words[0][:10].upper()
+    return "".join(w[0] for w in words[:6]).upper()
 
 async def _fetch_myneta_soup(url):
     headers = {"User-Agent": "Mozilla/5.0 VoteWiseIndia/1.0"}
@@ -333,6 +348,94 @@ async def _live_parties():
             "source": "MyNeta",
         })
     return parties
+
+def _extract_party_line(line):
+    line = _normalize_party_name(line)
+    if not line:
+        return None
+    if line in {"Income-Expenditure Statement", "Donations"}:
+        return None
+    if line.startswith("Click here"):
+        return None
+    match = re.match(r"^(.*?)\s*\(([^()]*)\)$", line)
+    if not match:
+        return None
+    full_name = _normalize_party_name(match.group(1))
+    abbreviation = _normalize_party_name(match.group(2))
+    if not re.search(r"[A-Za-z]", full_name):
+        return None
+    if re.match(r"^\d", full_name):
+        return None
+    if not full_name:
+        return None
+    return full_name, abbreviation
+
+async def _scrape_myneta_parties():
+    cached = _cache_get(("myneta", "parties_master"))
+    if cached is not None:
+        return cached
+
+    party_map = {}
+
+    # National + state-recognized + state-unrecognized (directory style)
+    for url in [
+        "https://www.myneta.info/party/",
+        "https://www.myneta.info/party/index.php?action=other_parties",
+    ]:
+        try:
+            soup = await _fetch_myneta_soup(url)
+            for line in soup.get_text("\n").splitlines():
+                parsed = _extract_party_line(line)
+                if not parsed:
+                    continue
+                full_name, abbreviation = parsed
+                if abbreviation.upper() == "IND":
+                    continue
+                key = _make_party_key(full_name, abbreviation)
+                party_map[key] = {
+                    "id": f"myneta-{len(party_map) + 1}",
+                    "abbreviation": abbreviation,
+                    "full_name": full_name,
+                    "color": PARTY_COLORS.get(abbreviation, "#9E9E9E"),
+                    "source": "MyNeta",
+                }
+        except Exception as exc:
+            logger.warning(f"MyNeta party directory fetch failed for {url}: {exc}")
+
+    # State unrecognized bulk pages (may not provide abbreviations)
+    for url in [
+        "https://myneta.info/party/unrecognized_parties.php",
+        "https://myneta.info/party/unrecognized_parties_bihar.php",
+    ]:
+        try:
+            soup = await _fetch_myneta_soup(url)
+            for row in soup.select("table tr"):
+                cols = row.find_all("td")
+                if len(cols) < 3:
+                    continue
+                full_name = _normalize_party_name(cols[2].get_text(" ", strip=True))
+                if not full_name:
+                    continue
+                if not re.search(r"[A-Za-z]", full_name):
+                    continue
+                if re.match(r"^\d", full_name):
+                    continue
+                abbreviation = _abbr_from_name(full_name)
+                key = _make_party_key(full_name, abbreviation)
+                if key in party_map:
+                    continue
+                party_map[key] = {
+                    "id": f"myneta-{len(party_map) + 1}",
+                    "abbreviation": abbreviation,
+                    "full_name": full_name,
+                    "color": PARTY_COLORS.get(abbreviation, "#9E9E9E"),
+                    "source": "MyNeta",
+                }
+        except Exception as exc:
+            logger.warning(f"MyNeta unrecognized party fetch failed for {url}: {exc}")
+
+    parties = sorted(party_map.values(), key=lambda p: p["full_name"])
+    return _cache_set(("myneta", "parties_master"), parties)
 
 def _read_parties_from_db_file(db_file):
     conn = None
@@ -529,6 +632,10 @@ async def get_constituencies_list(state: str = None):
 @app.get("/api/parties")
 async def get_parties():
     try:
+        live_parties = await _scrape_myneta_parties()
+        if live_parties:
+            return live_parties
+
         parties = _read_parties_from_db_file(db.DB_FILE)
         if parties:
             return parties
