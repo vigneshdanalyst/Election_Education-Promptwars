@@ -164,18 +164,14 @@ def _cache_set(key, value):
     return value
 
 def _normalize_party_name(value):
-    return re.sub(r"\s+", " ", (value or "").strip())
+    text = (value or "").replace("\xa0", " ").strip()
+    text = re.sub(r"\s+", " ", text)
+    text = re.sub(r"\s+\)", ")", text)
+    text = re.sub(r"\(\s+", "(", text)
+    return text
 
-def _make_party_key(full_name, abbreviation):
-    return f"{_normalize_party_name(full_name).lower()}|{(abbreviation or '').strip().upper()}"
-
-def _abbr_from_name(full_name):
-    words = [w for w in re.split(r"[^A-Za-z0-9]+", full_name or "") if w]
-    if not words:
-        return ""
-    if len(words) == 1:
-        return words[0][:10].upper()
-    return "".join(w[0] for w in words[:6]).upper()
+def _make_party_key(full_name):
+    return _normalize_party_name(full_name).lower()
 
 async def _fetch_myneta_soup(url):
     headers = {"User-Agent": "Mozilla/5.0 VoteWiseIndia/1.0"}
@@ -340,13 +336,7 @@ async def _live_parties():
 
     parties = []
     for index, (abbr, _count) in enumerate(counts.most_common(), start=1):
-        parties.append({
-            "id": f"live-{index}",
-            "abbreviation": abbr,
-            "full_name": PARTY_FULL_NAMES.get(abbr, abbr),
-            "color": PARTY_COLORS.get(abbr, "#9E9E9E"),
-            "source": "MyNeta",
-        })
+        parties.append({"id": f"live-{index}", "full_name": PARTY_FULL_NAMES.get(abbr, abbr), "source": "MyNeta"})
     return parties
 
 def _extract_party_line(line):
@@ -361,14 +351,13 @@ def _extract_party_line(line):
     if not match:
         return None
     full_name = _normalize_party_name(match.group(1))
-    abbreviation = _normalize_party_name(match.group(2))
     if not re.search(r"[A-Za-z]", full_name):
         return None
     if re.match(r"^\d", full_name):
         return None
     if not full_name:
         return None
-    return full_name, abbreviation
+    return full_name
 
 async def _scrape_myneta_parties():
     cached = _cache_get(("myneta", "parties_master"))
@@ -385,18 +374,15 @@ async def _scrape_myneta_parties():
         try:
             soup = await _fetch_myneta_soup(url)
             for line in soup.get_text("\n").splitlines():
-                parsed = _extract_party_line(line)
-                if not parsed:
+                full_name = _extract_party_line(line)
+                if not full_name:
                     continue
-                full_name, abbreviation = parsed
-                if abbreviation.upper() == "IND":
+                if full_name.lower() == "independent":
                     continue
-                key = _make_party_key(full_name, abbreviation)
+                key = _make_party_key(full_name)
                 party_map[key] = {
                     "id": f"myneta-{len(party_map) + 1}",
-                    "abbreviation": abbreviation,
                     "full_name": full_name,
-                    "color": PARTY_COLORS.get(abbreviation, "#9E9E9E"),
                     "source": "MyNeta",
                 }
         except Exception as exc:
@@ -416,19 +402,20 @@ async def _scrape_myneta_parties():
                 full_name = _normalize_party_name(cols[2].get_text(" ", strip=True))
                 if not full_name:
                     continue
+                if "registered unrecognised political party" in full_name.lower():
+                    continue
                 if not re.search(r"[A-Za-z]", full_name):
                     continue
                 if re.match(r"^\d", full_name):
                     continue
-                abbreviation = _abbr_from_name(full_name)
-                key = _make_party_key(full_name, abbreviation)
+                if len(full_name) < 3:
+                    continue
+                key = _make_party_key(full_name)
                 if key in party_map:
                     continue
                 party_map[key] = {
                     "id": f"myneta-{len(party_map) + 1}",
-                    "abbreviation": abbreviation,
                     "full_name": full_name,
-                    "color": PARTY_COLORS.get(abbreviation, "#9E9E9E"),
                     "source": "MyNeta",
                 }
         except Exception as exc:
@@ -444,13 +431,22 @@ def _read_parties_from_db_file(db_file):
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
         c.execute("""
-            SELECT p.id, p.abbreviation, p.full_name, p.color
+            SELECT p.id, p.full_name
             FROM parties p
-            WHERE p.abbreviation IS NOT NULL
-              AND p.abbreviation != 'IND'
-            ORDER BY p.abbreviation
+            WHERE p.full_name IS NOT NULL
+              AND TRIM(p.full_name) != ''
+            ORDER BY p.full_name
         """)
-        return [dict(row) for row in c.fetchall()]
+        rows = [{"id": row["id"], "full_name": _normalize_party_name(row["full_name"]), "source": "SQLite"} for row in c.fetchall()]
+        seen = set()
+        parties = []
+        for row in rows:
+            key = _make_party_key(row["full_name"])
+            if key in seen or key == "independent":
+                continue
+            seen.add(key)
+            parties.append(row)
+        return parties
     except sqlite3.Error as exc:
         logger.warning(f"Unable to read parties from {db_file}: {exc}")
         return []

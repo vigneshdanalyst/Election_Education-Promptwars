@@ -214,14 +214,12 @@ async function initParties() {
                 <table class="table">
                     <thead>
                         <tr>
-                            <th>Short Name</th>
-                            <th>Full Name</th>
+                            <th>Party Name</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${data.map(p => `
                             <tr>
-                                <td style="font-weight:700; color:${p.color || 'var(--text-primary)'};">${p.abbreviation || '-'}</td>
                                 <td>${p.full_name || '-'}</td>
                             </tr>
                         `).join('')}
