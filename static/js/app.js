@@ -9,7 +9,6 @@ if (typeof Chart !== 'undefined') {
 const routes = {
     '': '/static/pages/home.html',
     '#home': '/static/pages/home.html',
-    '#parties': '/static/pages/parties.html',
     '#candidates': '/static/pages/candidates.html',
     '#constituencies': '/static/pages/constituencies.html',
     '#elector-stats': '/static/pages/elector-stats.html',
@@ -42,7 +41,6 @@ async function navigate() {
         const constId = document.getElementById('global-constituency-filter')?.value || '';
 
         if (hash === '#home' || hash === '') initHome(state, constId);
-        if (hash === '#parties') initParties();
         if (hash === '#candidates') initCandidates(state, constId);
         if (hash === '#constituencies') initConstituencies(state, constId);
         if (hash === '#results') initResults();
@@ -200,41 +198,9 @@ async function initHome(state = '', constId = '') {
     }
 }
 
-async function initParties() {
-    const container = document.getElementById('parties-list');
-    if (!container) return;
-
-    try {
-        const res = await fetch(`${API_BASE}/parties`);
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-        const data = await res.json();
-
-        container.innerHTML = `
-            <div class="table-responsive">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Party Name</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${data.map(p => `
-                            <tr>
-                                <td>${p.full_name || '-'}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-        `;
-    } catch (e) {
-        console.error("Failed to load parties:", e);
-        container.innerHTML = `<div class="card text-saffron">Error loading parties: ${e.message}</div>`;
-    }
-}
-
 let candidatePage = 1;
 const candidateLimit = 50;
+let loadedCandidates = [];
 
 function changeCandidatePage(delta) {
     candidatePage = Math.max(1, candidatePage + delta);
@@ -244,12 +210,52 @@ function changeCandidatePage(delta) {
 async function initCandidates(state = '', constId = '') {
     const stateFilter = document.getElementById('global-state-filter');
     const constFilter = document.getElementById('global-constituency-filter');
+    const searchInput = document.getElementById('candidate-search');
+    const reservedSelect = document.getElementById('candidate-reserved');
+
+    if (searchInput && !searchInput.dataset.bound) {
+        searchInput.addEventListener('input', applyCandidateFilters);
+        searchInput.dataset.bound = '1';
+    }
+    if (reservedSelect && !reservedSelect.dataset.bound) {
+        reservedSelect.addEventListener('change', () => {
+            candidatePage = 1;
+            initCandidates();
+        });
+        reservedSelect.dataset.bound = '1';
+    }
+
     await fetchCandidatesData(state || stateFilter?.value || '', constId || constFilter?.value || '');
+}
+
+function applyCandidateFilters() {
+    const search = (document.getElementById('candidate-search')?.value || '').toLowerCase().trim();
+    const rows = loadedCandidates.filter(c => {
+        if (!search) return true;
+        const name = (c.name || '').toLowerCase();
+        const constituency = (c.constituency_name || '').toLowerCase();
+        const party = (c.party_abbr || c.party_name || '').toLowerCase();
+        return name.includes(search) || constituency.includes(search) || party.includes(search);
+    });
+
+    const tbody = document.getElementById('candidates-tbody');
+    if (tbody) {
+        tbody.innerHTML = rows.length ? rows.map(c => `
+            <tr>
+                <td><img src="${c.photo_url}" width="40" style="border-radius:50%"></td>
+                <td><a href="${c.myneta_url || `#candidate/${c.id}`}" ${c.myneta_url ? 'target="_blank" rel="noopener"' : ''} style="color:var(--accent-saffron); font-weight:bold;">${c.name}</a><br><small class="text-muted">${c.age ? c.age + ' Yrs' : ''} ${c.gender ? '• ' + c.gender : ''}</small></td>
+                <td><span style="color:${c.party_color || '#9E9E9E'};font-weight:bold">${c.party_abbr || '-'}</span></td>
+                <td>${c.constituency_name || '-'}<br><small class="text-muted">${c.state_name || ''}</small></td>
+                <td>${c.education || '-'}</td>
+                <td>Rs ${c.assets_cr || 0} Cr</td>
+                <td>${c.criminal_cases > 0 ? `<span style="color:red">${c.criminal_cases}</span>` : '0'}</td>
+            </tr>
+        `).join('') : `<tr><td colspan="7" class="text-muted">No candidates match the search.</td></tr>`;
+    }
 }
 
 async function fetchCandidatesData(state = '', constId = '') {
     const reserved = document.getElementById('candidate-reserved')?.value || '';
-    const search = (document.getElementById('candidate-search')?.value || '').toLowerCase();
     const params = new URLSearchParams({ limit: String(candidateLimit), page: String(candidatePage) });
     if (state) params.append('state', state);
     if (constId) params.append('constituency_id', constId);
@@ -259,11 +265,12 @@ async function fetchCandidatesData(state = '', constId = '') {
     if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="text-muted">Loading candidates...</td></tr>`;
 
     const res = await fetch(`${API_BASE}/candidates?${params.toString()}`);
+    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
     const data = await res.json();
-    const rows = (data.data || []).filter(c => !search || c.name.toLowerCase().includes(search) || c.constituency_name.toLowerCase().includes(search) || c.party_abbr.toLowerCase().includes(search));
+    loadedCandidates = data.data || [];
     const source = document.getElementById('candidate-source');
-    if (source) source.innerText = `${data.source || 'Database'} | ${(data.total || rows.length).toLocaleString()} candidates`;
-    const totalPages = Math.max(1, Math.ceil((data.total || rows.length || 1) / candidateLimit));
+    if (source) source.innerText = `${data.source || 'Database'} | ${(data.total || loadedCandidates.length).toLocaleString()} candidates`;
+    const totalPages = Math.max(1, Math.ceil((data.total || loadedCandidates.length || 1) / candidateLimit));
     const pageInfo = document.getElementById('candidate-page-info');
     const prev = document.getElementById('candidate-prev');
     const next = document.getElementById('candidate-next');
@@ -271,19 +278,7 @@ async function fetchCandidatesData(state = '', constId = '') {
     if (prev) prev.disabled = candidatePage <= 1;
     if (next) next.disabled = candidatePage >= totalPages;
 
-    if (tbody) {
-        tbody.innerHTML = rows.length ? rows.map(c => `
-            <tr>
-                <td><img src="${c.photo_url}" width="40" style="border-radius:50%"></td>
-                <td><a href="${c.myneta_url || `#candidate/${c.id}`}" ${c.myneta_url ? 'target="_blank" rel="noopener"' : ''} style="color:var(--accent-saffron); font-weight:bold;">${c.name}</a><br><small class="text-muted">${c.age ? c.age + ' Yrs' : ''} ${c.gender ? '• ' + c.gender : ''}</small></td>
-                <td><span style="color:${c.party_color || '#9E9E9E'};font-weight:bold">${c.party_abbr}</span></td>
-                <td>${c.constituency_name}<br><small class="text-muted">${c.state_name || ''}</small></td>
-                <td>${c.education}</td>
-                <td>Rs ${c.assets_cr} Cr</td>
-                <td>${c.criminal_cases > 0 ? `<span style="color:red">${c.criminal_cases}</span>` : '0'}</td>
-            </tr>
-        `).join('') : `<tr><td colspan="7" class="text-muted">No candidates loaded for this filter.</td></tr>`;
-    }
+    applyCandidateFilters();
 }
 
 async function initConstituencies(state = '', constId = '') {
