@@ -4,6 +4,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
+from collections import Counter
 import os
 import re
 import time
@@ -300,6 +301,26 @@ async def _candidate_sample(state=None, pages=2):
                 break
     return sample
 
+async def _live_parties():
+    sample = await _candidate_sample(pages=2)
+    counts = Counter()
+    for row in sample:
+        party_abbr = (row.get("party_abbr") or "").strip()
+        if party_abbr and party_abbr != "IND":
+            counts[party_abbr] += 1
+
+    parties = []
+    for index, (abbr, count) in enumerate(counts.most_common(), start=1):
+        parties.append({
+            "id": f"live-{index}",
+            "abbreviation": abbr,
+            "full_name": abbr,
+            "color": PARTY_COLORS.get(abbr, "#9E9E9E"),
+            "candidates_count": count,
+            "source": "MyNeta",
+        })
+    return parties
+
 def _is_int(value):
     return value is not None and str(value).isdigit()
 
@@ -473,37 +494,53 @@ async def get_constituencies_list(state: str = None):
 
 @app.get("/api/parties")
 async def get_parties():
-    conn = db.get_db_connection()
-    c = conn.cursor()
-    c.execute("""
-        SELECT p.*
-        FROM parties p
-    """)
-    parties = [dict(row) for row in c.fetchall()]
+    conn = None
+    try:
+        conn = db.get_db_connection()
+        c = conn.cursor()
+        c.execute("""
+            SELECT p.*
+            FROM parties p
+        """)
+        parties = [dict(row) for row in c.fetchall()]
 
-    states_tuple = tuple(ELECTION_STATES_2026.keys())
-    placeholders = ','.join(['?'] * len(states_tuple))
+        states_tuple = tuple(ELECTION_STATES_2026.keys())
+        placeholders = ','.join(['?'] * len(states_tuple))
 
-    for p in parties:
-        c.execute(
-            f"""
-            SELECT COUNT(*)
-            FROM candidates c
-            JOIN constituencies co ON c.constituency_id = co.id
-            WHERE c.party_id = ? AND co.state IN ({placeholders})
-            """,
-            (p["id"], *states_tuple),
-        )
-        p['candidates_count'] = c.fetchone()[0]
+        for p in parties:
+            c.execute(
+                f"""
+                SELECT COUNT(*)
+                FROM candidates c
+                JOIN constituencies co ON c.constituency_id = co.id
+                WHERE c.party_id = ? AND co.state IN ({placeholders})
+                """,
+                (p["id"], *states_tuple),
+            )
+            p['candidates_count'] = c.fetchone()[0]
 
-    parties = [party for party in parties if party.get('abbreviation') and party['abbreviation'] != 'IND']
-    parties.sort(key=lambda party: party["candidates_count"], reverse=True)
-    conn.close()
-    return parties
+        parties = [party for party in parties if party.get('abbreviation') and party['abbreviation'] != 'IND']
+        parties.sort(key=lambda party: party["candidates_count"], reverse=True)
+        return parties
+    except sqlite3.Error as exc:
+        logger.warning(f"Database unavailable for /api/parties, using live fallback: {exc}")
+        try:
+            return await _live_parties()
+        except Exception as live_exc:
+            logger.error(f"Live fallback failed for /api/parties: {live_exc}")
+            return []
+    finally:
+        if conn:
+            conn.close()
 
 @app.get("/api/candidates")
 async def get_candidates(page: int = 1, limit: int = 50, party: str = None, gender: str = None, reserved: str = None, state: str = None, constituency_id: str = None):
-    local_is_ready = _local_candidate_count(state) >= _local_candidate_threshold(state)
+    local_is_ready = False
+    if not _is_int(constituency_id):
+        try:
+            local_is_ready = _local_candidate_count(state) >= _local_candidate_threshold(state)
+        except sqlite3.Error as exc:
+            logger.warning(f"Database unavailable for candidate readiness check, using live fallback: {exc}")
     if not _is_int(constituency_id) and not local_is_ready:
         try:
             if state in ELECTION_STATES_2026:
@@ -527,55 +564,81 @@ async def get_candidates(page: int = 1, limit: int = 50, party: str = None, gend
     elif constituency_id:
         constituency_id = int(constituency_id)
 
-    conn = db.get_db_connection()
-    c = conn.cursor()
+    conn = None
+    try:
+        conn = db.get_db_connection()
+        c = conn.cursor()
 
-    query = """
-        SELECT c.*, p.abbreviation as party_abbr, p.color as party_color, const.name as constituency_name, const.type as const_type, const.state as state_name
-        FROM candidates c
-        JOIN parties p ON c.party_id = p.id
-        JOIN constituencies const ON c.constituency_id = const.id
-        WHERE 1=1
-    """
-    params = []
+        query = """
+            SELECT c.*, p.abbreviation as party_abbr, p.color as party_color, const.name as constituency_name, const.type as const_type, const.state as state_name
+            FROM candidates c
+            JOIN parties p ON c.party_id = p.id
+            JOIN constituencies const ON c.constituency_id = const.id
+            WHERE 1=1
+        """
+        params = []
 
-    if state:
-        query += " AND const.state = ?"
-        params.append(state)
-    elif not constituency_id:
-        query += " AND const.state IN (?, ?, ?, ?, ?)"
-        params.extend(ELECTION_STATES_2026.keys())
-    if constituency_id:
-        query += " AND c.constituency_id = ?"
-        params.append(constituency_id)
-    if party:
-        query += " AND p.abbreviation = ?"
-        params.append(party)
-    if gender:
-        query += " AND c.gender = ?"
-        params.append(gender)
-    if reserved:
-        query += " AND const.type = ?"
-        params.append(reserved)
+        if state:
+            query += " AND const.state = ?"
+            params.append(state)
+        elif not constituency_id:
+            query += " AND const.state IN (?, ?, ?, ?, ?)"
+            params.extend(ELECTION_STATES_2026.keys())
+        if constituency_id:
+            query += " AND c.constituency_id = ?"
+            params.append(constituency_id)
+        if party:
+            query += " AND p.abbreviation = ?"
+            params.append(party)
+        if gender:
+            query += " AND c.gender = ?"
+            params.append(gender)
+        if reserved:
+            query += " AND const.type = ?"
+            params.append(reserved)
 
-    c.execute(f"SELECT COUNT(*) FROM ({query}) AS sub", params)
-    total = c.fetchone()[0]
+        c.execute(f"SELECT COUNT(*) FROM ({query}) AS sub", params)
+        total = c.fetchone()[0]
 
-    query += " LIMIT ? OFFSET ?"
-    params.extend([limit, (page - 1) * limit])
+        query += " LIMIT ? OFFSET ?"
+        params.extend([limit, (page - 1) * limit])
 
-    c.execute(query, params)
-    candidates = [dict(row) for row in c.fetchall()]
-    conn.close()
+        c.execute(query, params)
+        candidates = [dict(row) for row in c.fetchall()]
 
-    return {
-        "total": total,
-        "page": page,
-        "limit": limit,
-        "source": "SQLite",
-        "storage": "db",
-        "data": candidates
-    }
+        return {
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "source": "SQLite",
+            "storage": "db",
+            "data": candidates
+        }
+    except sqlite3.Error as exc:
+        logger.warning(f"Database unavailable for /api/candidates: {exc}")
+        try:
+            if state in ELECTION_STATES_2026:
+                live = await _scrape_myneta_candidates(state, page=page, limit=limit)
+            else:
+                offset = max(0, (page - 1) * limit)
+                state_name, state_page = _state_page_for_global_offset(offset)
+                live = await _scrape_myneta_candidates(state_name, page=state_page, limit=limit)
+                live["total"] = sum(meta["candidates"] for meta in ELECTION_STATES_2026.values())
+                live["page"] = page
+                live["state_page"] = state_page
+                live["state_name"] = state_name
+            if party:
+                live["data"] = [row for row in live["data"] if row["party_abbr"].upper() == party.upper()]
+            if reserved:
+                live["data"] = [row for row in live["data"] if row["const_type"] == reserved]
+            live["storage"] = "live"
+            return live
+        except Exception as live_exc:
+            logger.error(f"Live fallback failed for /api/candidates: {live_exc}")
+            raise HTTPException(status_code=503, detail="Candidates temporarily unavailable")
+    finally:
+        if conn:
+            conn.close()
 
 @app.get("/api/candidate/{id}")
 async def get_candidate_detail(id: int):
