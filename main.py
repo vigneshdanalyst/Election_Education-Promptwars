@@ -22,7 +22,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Matdata Mitra API")
+app = FastAPI(title="VoteWise India API")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -149,7 +149,7 @@ def _cache_set(key, value):
     return value
 
 async def _fetch_myneta_soup(url):
-    headers = {"User-Agent": "Mozilla/5.0 MatdataMitra/1.0"}
+    headers = {"User-Agent": "Mozilla/5.0 VoteWiseIndia/1.0"}
     async with httpx.AsyncClient(timeout=20, follow_redirects=True, headers=headers) as client:
         response = await client.get(url)
         response.raise_for_status()
@@ -859,7 +859,7 @@ async def get_constituency_detail(id: int):
 
 @app.post("/api/chat")
 async def chat_endpoint(request: ChatRequest):
-    system_prompt = "You are Matdata Mitra, an expert on Indian elections, ECI rules, voter rights, and constitutional democratic processes. Be concise, factual, and cite ECI guidelines. You must always reply in English, regardless of the user's language."
+    system_prompt = "You are VoteWise India, an expert on Indian elections, ECI rules, voter rights, and constitutional democratic processes. Be concise, factual, and cite ECI guidelines. You must always reply in English, regardless of the user's language."
     
     if GROQ_API_KEY:
         try:

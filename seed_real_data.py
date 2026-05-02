@@ -1,5 +1,5 @@
 """
-Matdata Mitra — MyNeta Playwright Scraper
+VoteWise India — MyNeta Playwright Scraper
 Uses a real headless Chromium browser to scrape data (bypasses rate limiting).
 Scrapes from the paginated summary/candidates_analyzed pages.
 """

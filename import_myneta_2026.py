@@ -57,7 +57,7 @@ def strip_tags(value):
 def get_html(url):
     request = urllib.request.Request(
         url,
-        headers={"User-Agent": "Mozilla/5.0 MatdataMitra/1.0"},
+        headers={"User-Agent": "Mozilla/5.0 VoteWiseIndia/1.0"},
     )
     with urllib.request.urlopen(request, timeout=30) as response:
         return response.read().decode("utf-8", errors="replace")

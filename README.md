@@ -1,6 +1,6 @@
-# Matdata Mitra 🇮🇳
+# VoteWise India 🇮🇳
 
-Matdata Mitra is a comprehensive, production-grade Election Process Education Assistant for India. It provides real-time information about the Indian electoral process, candidate details, live results, and an AI-powered chat assistant.
+VoteWise India is a comprehensive, production-grade Election Process Education Assistant for India. It provides real-time information about the Indian electoral process, candidate details, live results, and an AI-powered chat assistant.
 
 ## Features
 

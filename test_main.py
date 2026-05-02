@@ -1,4 +1,4 @@
-"""Basic tests for Matdata Mitra API."""
+"""Basic tests for VoteWise India API."""
 import pytest
 from fastapi.testclient import TestClient
 from main import app
