@@ -2,25 +2,35 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies for Playwright
+# Install system dependencies manually (bypassing playwright install-deps)
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
+    libnss3 \
+    libatk-bridge2.0-0 \
+    libdrm2 \
+    libxkbcommon0 \
+    libgbm1 \
+    libasound2 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    fonts-liberation \
+    fonts-dejavu-core \
+    fonts-noto \
+    libgtk-3-0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Playwright and browsers with correct dependencies
+# Install Playwright but WITHOUT automatic dependency installation
 RUN playwright install chromium
-RUN playwright install-deps chromium
 
 # Copy application code
 COPY . .
-
-# Run database setup (make sure this doesn't block or fail)
-RUN python db.py
 
 EXPOSE 8080
 
