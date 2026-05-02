@@ -82,11 +82,25 @@ ELECTION_STATES_2026 = {
 
 LIVE_CACHE = {}
 LIVE_CACHE_SECONDS = 900
+DB_FALLBACK_FILES = ["matdata_mitra.db", "election_data.db"]
 
 PARTY_COLORS = {
     "DMK": "#D32F2F", "INC": "#1976D2", "BJP": "#F57C00", "AIADMK": "#388E3C",
     "ADMK": "#388E3C", "TMC": "#2E7D32", "AITC": "#2E7D32", "CPI": "#E53935",
     "CPI(M)": "#B71C1C", "CPIM": "#B71C1C", "IND": "#9E9E9E", "AAP": "#00BCD4",
+}
+
+PARTY_FULL_NAMES = {
+    "BJP": "Bharatiya Janata Party",
+    "INC": "Indian National Congress",
+    "AAP": "Aam Aadmi Party",
+    "TMC": "All India Trinamool Congress",
+    "DMK": "Dravida Munnetra Kazhagam",
+    "ADMK": "All India Anna Dravida Munnetra Kazhagam",
+    "AIADMK": "All India Anna Dravida Munnetra Kazhagam",
+    "CPI": "Communist Party of India",
+    "CPI(M)": "Communist Party of India (Marxist)",
+    "CPIM": "Communist Party of India (Marxist)",
 }
 
 def _state_summary(name, meta):
@@ -310,16 +324,36 @@ async def _live_parties():
             counts[party_abbr] += 1
 
     parties = []
-    for index, (abbr, count) in enumerate(counts.most_common(), start=1):
+    for index, (abbr, _count) in enumerate(counts.most_common(), start=1):
         parties.append({
             "id": f"live-{index}",
             "abbreviation": abbr,
-            "full_name": abbr,
+            "full_name": PARTY_FULL_NAMES.get(abbr, abbr),
             "color": PARTY_COLORS.get(abbr, "#9E9E9E"),
-            "candidates_count": count,
             "source": "MyNeta",
         })
     return parties
+
+def _read_parties_from_db_file(db_file):
+    conn = None
+    try:
+        conn = sqlite3.connect(db_file)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        c.execute("""
+            SELECT p.id, p.abbreviation, p.full_name, p.color
+            FROM parties p
+            WHERE p.abbreviation IS NOT NULL
+              AND p.abbreviation != 'IND'
+            ORDER BY p.abbreviation
+        """)
+        return [dict(row) for row in c.fetchall()]
+    except sqlite3.Error as exc:
+        logger.warning(f"Unable to read parties from {db_file}: {exc}")
+        return []
+    finally:
+        if conn:
+            conn.close()
 
 def _is_int(value):
     return value is not None and str(value).isdigit()
@@ -494,44 +528,26 @@ async def get_constituencies_list(state: str = None):
 
 @app.get("/api/parties")
 async def get_parties():
-    conn = None
     try:
-        conn = db.get_db_connection()
-        c = conn.cursor()
-        c.execute("""
-            SELECT p.*
-            FROM parties p
-        """)
-        parties = [dict(row) for row in c.fetchall()]
+        parties = _read_parties_from_db_file(db.DB_FILE)
+        if parties:
+            return parties
 
-        states_tuple = tuple(ELECTION_STATES_2026.keys())
-        placeholders = ','.join(['?'] * len(states_tuple))
-
-        for p in parties:
-            c.execute(
-                f"""
-                SELECT COUNT(*)
-                FROM candidates c
-                JOIN constituencies co ON c.constituency_id = co.id
-                WHERE c.party_id = ? AND co.state IN ({placeholders})
-                """,
-                (p["id"], *states_tuple),
-            )
-            p['candidates_count'] = c.fetchone()[0]
-
-        parties = [party for party in parties if party.get('abbreviation') and party['abbreviation'] != 'IND']
-        parties.sort(key=lambda party: party["candidates_count"], reverse=True)
-        return parties
+        # If runtime points to an empty/wrong SQLite file, recover from known local files.
+        for db_file in DB_FALLBACK_FILES:
+            if db_file == db.DB_FILE:
+                continue
+            parties = _read_parties_from_db_file(db_file)
+            if parties:
+                logger.warning(f"Using fallback party source from {db_file}")
+                return parties
     except sqlite3.Error as exc:
         logger.warning(f"Database unavailable for /api/parties, using live fallback: {exc}")
-        try:
-            return await _live_parties()
-        except Exception as live_exc:
-            logger.error(f"Live fallback failed for /api/parties: {live_exc}")
-            return []
-    finally:
-        if conn:
-            conn.close()
+    try:
+        return await _live_parties()
+    except Exception as live_exc:
+        logger.error(f"Live fallback failed for /api/parties: {live_exc}")
+        return []
 
 @app.get("/api/candidates")
 async def get_candidates(page: int = 1, limit: int = 50, party: str = None, gender: str = None, reserved: str = None, state: str = None, constituency_id: str = None):

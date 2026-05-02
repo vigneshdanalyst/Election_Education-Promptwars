@@ -216,7 +216,6 @@ async function initParties() {
                         <tr>
                             <th>Short Name</th>
                             <th>Full Name</th>
-                            <th>Candidates</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -224,7 +223,6 @@ async function initParties() {
                             <tr>
                                 <td style="font-weight:700; color:${p.color || 'var(--text-primary)'};">${p.abbreviation || '-'}</td>
                                 <td>${p.full_name || '-'}</td>
-                                <td>${(p.candidates_count || 0).toLocaleString()}</td>
                             </tr>
                         `).join('')}
                     </tbody>
